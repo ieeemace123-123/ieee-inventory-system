@@ -1,0 +1,84 @@
+================================================================================
+                     IEEE INVENTORY RENTAL MANAGEMENT SYSTEM
+                             PROJECT CONCLUSION & GUIDE
+================================================================================
+
+1. PROJECT OVERVIEW & ARCHITECTURE
+--------------------------------------------------------------------------------
+This application is a full-stack Web Application designed for IEEE Student Branches
+to manage equipment, components, and member rental transactions with automated
+email notifications and bulk Excel import/export capabilities.
+
+
+2. TECHNOLOGIES USED
+--------------------------------------------------------------------------------
+
+A. BACKEND (API & SERVICE LAYER)
+   • Runtime: Node.js (ES Modules / "type": "module")
+   • Web Framework: Express.js (v5.0)
+   • Authentication: JSON Web Tokens (JWT) & bcryptjs password hashing
+   • Database Driver: pg (node-postgres) with connection pooling & SSL support
+   • Scheduled Jobs: node-cron for daily automated return reminders & overdue checks
+   • Mailing System: Nodemailer (SMTP integration for Gmail)
+   • File Processing: Multer (in-memory uploads) & XLSX (Excel generation/parsing)
+   • Deployment Entrypoint: Compatible with both traditional Node server and Vercel serverless functions
+
+B. FRONTEND (USER INTERFACE)
+   • Library/Framework: React 19
+   • Build Tool & Dev Server: Vite 6
+   • Styling: TailwindCSS (v4)
+   • HTTP Client: Axios (configured with authorization token interceptors & 401 handler)
+   • Icons: Lucide React
+
+C. DATABASE SYSTEM
+   • Engine: PostgreSQL (Cloud database hosted on Supabase)
+   • Architecture: Relational database schema with 5 primary tables:
+       1. admins              - Store admin authentication credentials
+       2. members             - IEEE student members with soft-delete (is_deleted) flag
+       3. items               - Inventory components with live stock tracking
+       4. rentals             - Active, returned, and overdue rental transactions
+       5. email_notifications - Audit log for sent reminder and overdue emails
+   • Schema Management: Automatic migration checks and database seeding at startup
+
+
+3. HOW TO RUN THE ENTIRE PROJECT IN THE TERMINAL
+--------------------------------------------------------------------------------
+
+PREREQUISITES:
+  • Node.js (v18 or higher installed)
+  • npm (Node Package Manager)
+
+STEP 1: OPEN YOUR TERMINAL IN THE PROJECT ROOT DIRECTORY
+  c:\Users\Admin\Documents\IEEE
+
+STEP 2: VERIFY ENVIRONMENT CONFIGURATION
+  Ensure the database URL and credentials are set in backend/.env:
+    DATABASE_URL="postgresql://<user>:<password>@<host>:6543/postgres?pgbouncer=true"
+    JWT_SECRET="ieee_inventory_secret_jwt_key_2026_super_secure"
+    ADMIN_USERNAME="admin"
+    ADMIN_PASSWORD="inventory46@64"
+
+STEP 3: SEED THE POSTGRESQL DATABASE (First-time setup or reset)
+  In terminal root, execute:
+    npm run seed
+
+STEP 4: START THE BACKEND SERVER
+  Open a terminal window in project root and run:
+    npm run dev:backend
+
+  Output will show:
+    🚀 IEEE Inventory Rental Server running on port 5000
+    📍 API Health: http://localhost:5000/api/health
+
+STEP 5: START THE FRONTEND DEV SERVER
+  Open a second terminal window in project root and run:
+    npm run dev:frontend
+
+  Output will show:
+    ➜ Local: http://localhost:3000/
+
+STEP 6: ACCESS THE APPLICATION
+  Open your web browser and navigate to:
+    http://localhost:3000
+
+================================================================================

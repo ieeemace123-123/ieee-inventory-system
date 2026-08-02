@@ -1,0 +1,32 @@
+{
+  "name": "ieee-inventory-backend",
+  "version": "1.0.0",
+  "description": "Backend API for IEEE Inventory Rental Management System",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "setup-db": "node scripts/setup-db.js",
+    "seed": "node src/db/seed.js",
+    "test:email": "node scripts/test-email.js",
+    "diagnose:email": "node scripts/diagnose-email.js",
+    "diagnose:dashboard": "node scripts/test-overdue-dashboard.js",
+    "diagnose:member-delete": "node scripts/test-member-delete.js",
+    "diagnose:member-strategy": "node scripts/test-member-delete-strategy.js",
+    "diagnose:bulk-import": "node scripts/test-excel-bulk-import.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^5.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.2.0",
+    "node-cron": "^4.0.5",
+    "nodemailer": "^7.0.13",
+    "pg": "^8.13.3",
+    "serverless-http": "^4.0.0",
+    "xlsx": "^0.18.5"
+  }
+}

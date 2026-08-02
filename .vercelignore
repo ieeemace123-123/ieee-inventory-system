@@ -1,0 +1,7 @@
+# The entire backend/src is not needed by Vercel - api/index.js is fully self-contained
+backend/src/
+backend/api/
+backend/scripts/
+backend/data/
+backend/vercel.json
+frontend/vercel.json
