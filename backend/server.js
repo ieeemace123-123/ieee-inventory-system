@@ -1,5 +1,5 @@
-import app from '../backend/src/server.js';
-import { initDb } from '../backend/src/db/database.js';
+import app from './src/server.js';
+import { initDb } from './src/db/database.js';
 
 let isDbInitialized = false;
 
