@@ -53,14 +53,10 @@ export async function verifySMTPConnection() {
   const pass = process.env.SMTP_PASS;
 
   // Mask password: show first 2 and last 2 chars only
-  const maskedPass = pass
-    ? `${pass.slice(0, 2)}${'*'.repeat(Math.max(0, pass.length - 4))}${pass.slice(-2)}`
-    : '(not set)';
-
   console.log('[Mailer] ── SMTP Configuration ────────────────────────');
   console.log(`[Mailer]   Host : ${host}:${port}`);
   console.log(`[Mailer]   User : ${user}`);
-  console.log(`[Mailer]   Pass : ${maskedPass} (length: ${pass ? pass.length : 0})`);
+  console.log(`[Mailer]   Pass : ${pass ? '(configured)' : '(not set)'}`);
   console.log('[Mailer] ────────────────────────────────────────────────');
 
   if (!user || user === '(not set)') {
@@ -105,7 +101,7 @@ export async function sendMail({ to, subject, text, html }) {
     return { success: false, error: `Invalid recipient address: "${to}"` };
   }
 
-  const from = `"IEEE Inventory System" <${process.env.SMTP_USER || 'no-reply@ieee.org'}>`;
+  const from = `"IEEE MACE SB" <${process.env.SMTP_USER || 'no-reply@ieee.org'}>`;
 
   console.log(`[Mailer] 📤 Attempting to send email:`);
   console.log(`[Mailer]    To      : ${to}`);

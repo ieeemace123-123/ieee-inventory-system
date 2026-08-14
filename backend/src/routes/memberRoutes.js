@@ -6,6 +6,12 @@ import { authenticateAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
+const IEEE_MEMBERSHIP_VALIDATOR_URL = 'https://services24.ieee.org/membership-validator.html';
+
+router.get('/verify/:membership_id', (req, res) => {
+  return res.redirect(302, IEEE_MEMBERSHIP_VALIDATOR_URL);
+});
+
 // Multer in-memory storage for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -15,7 +21,7 @@ const upload = multer({
 // ── SPECIFIC NAMED ROUTES (Must be placed before /:id parameterized routes) ──
 
 // GET /api/members/verify/:membership_id (Public endpoint for background IEEE membership verification)
-router.get('/verify/:membership_id', async (req, res) => {
+router.get('/verify-local-disabled/:membership_id', async (req, res) => {
   try {
     const { membership_id } = req.params;
     if (!membership_id || !membership_id.trim()) {
@@ -78,6 +84,50 @@ router.get('/verify/:membership_id', async (req, res) => {
 // Protect ALL member management routes below with Admin JWT authentication
 router.use(authenticateAdmin);
 
+// GET /api/members/export (Admin: download the complete member register)
+router.get('/export', async (req, res) => {
+  try {
+    const db = getDbClient();
+    const members = await db.all(`
+      SELECT m.membership_id, m.name, m.email, m.phone, m.class_name, m.department,
+             m.status, m.membership_expiry_date::text AS membership_expiry_date,
+             m.last_renewed_at, m.created_at,
+             COUNT(r.id) AS total_rentals,
+             COUNT(CASE WHEN r.date_returned IS NULL THEN 1 END) AS active_rentals
+      FROM members m
+      LEFT JOIN rentals r ON r.member_id = m.id
+      WHERE (m.is_deleted IS NULL OR m.is_deleted = 0)
+      GROUP BY m.id
+      ORDER BY m.name ASC
+    `);
+    const rows = members.map(member => ({
+      'Membership ID': member.membership_id,
+      'Full Name': member.name,
+      'Email': member.email,
+      'Phone': member.phone || '',
+      'Class': member.class_name || '',
+      'Department': member.department || '',
+      'Status': member.status,
+      'Membership Expiry': member.membership_expiry_date || '',
+      'Last Renewed At': member.last_renewed_at || '',
+      'Registered At': member.created_at || '',
+      'Total Rentals': Number(member.total_rentals || 0),
+      'Active Rentals': Number(member.active_rentals || 0)
+    }));
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = [18, 28, 30, 16, 16, 20, 12, 18, 24, 24, 14, 14].map(wch => ({ wch }));
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Members');
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="IEEE_MACE_SB_Members.xlsx"');
+    return res.send(buffer);
+  } catch (error) {
+    console.error('[MemberRoutes] Error exporting members:', error);
+    return res.status(500).json({ error: 'Failed to export member details.' });
+  }
+});
+
 // GET /api/members/sample-template (Download sample Excel template - Admin required)
 router.get('/sample-template', (req, res) => {
   try {
@@ -86,16 +136,22 @@ router.get('/sample-template', (req, res) => {
       {
         'Membership ID': 'IEEE-2001',
         'Full Name': 'Sarah Connor',
+        'Class': 'S6 ECE',
+        'Department': 'Electronics and Communication Engineering',
         'Status': 'active'
       },
       {
         'Membership ID': 'IEEE-2002',
         'Full Name': 'David Miller',
+        'Class': 'S4 CSE',
+        'Department': 'Computer Science and Engineering',
         'Status': 'active'
       },
       {
         'Membership ID': 'IEEE-2003',
         'Full Name': 'Elena Rostova',
+        'Class': 'S8 EEE',
+        'Department': 'Electrical and Electronics Engineering',
         'Status': 'inactive'
       }
     ];
@@ -104,6 +160,8 @@ router.get('/sample-template', (req, res) => {
     ws['!cols'] = [
       { wch: 18 }, // Membership ID
       { wch: 24 }, // Full Name
+      { wch: 16 }, // Class
+      { wch: 42 }, // Department
       { wch: 12 }  // Status
     ];
 
@@ -192,6 +250,10 @@ router.post('/bulk-import', authenticateAdmin, upload.single('file'), async (req
           row['Department'] || row['department'] || row['Branch'] || 'IEEE Member'
         ).trim();
 
+        const className = String(
+          row['Class'] || row['class_name'] || row['Semester / Class'] || ''
+        ).trim();
+
         // 1. Check required fields: Membership ID and Name are mandatory
         if (!membershipId || !name) {
           skippedCount++;
@@ -214,8 +276,8 @@ router.post('/bulk-import', authenticateAdmin, upload.single('file'), async (req
         // 2. Check if already processed in this upload batch
         if (seenIdsInBatch.has(normalizedId)) {
           await client.query(
-            `UPDATE members SET name = $1, status = $2, is_deleted = 0 WHERE LOWER(membership_id) = $3`,
-            [name, memberStatus, normalizedId]
+            `UPDATE members SET name = $1, email = $2, phone = $3, class_name = $4, department = $5, status = $6, is_deleted = 0 WHERE LOWER(membership_id) = $7`,
+            [name, email, phone || null, className, department, memberStatus, normalizedId]
           );
           updatedCount++;
           details.push({
@@ -240,8 +302,8 @@ router.post('/bulk-import', authenticateAdmin, upload.single('file'), async (req
         if (existingMember) {
           // Upsert: Update existing member record
           await client.query(
-            `UPDATE members SET name = $1, status = $2, is_deleted = 0 WHERE id = $3`,
-            [name, memberStatus, existingMember.id]
+            `UPDATE members SET name = $1, email = $2, phone = $3, class_name = $4, department = $5, status = $6, is_deleted = 0 WHERE id = $7`,
+            [name, email, phone || null, className, department, memberStatus, existingMember.id]
           );
           updatedCount++;
           details.push({
@@ -254,9 +316,9 @@ router.post('/bulk-import', authenticateAdmin, upload.single('file'), async (req
         } else {
           // Insert new member
           await client.query(
-            `INSERT INTO members (membership_id, name, email, phone, department, status, is_deleted)
-             VALUES ($1, $2, $3, $4, $5, $6, 0)`,
-            [membershipId, name, email, phone || null, department, memberStatus]
+            `INSERT INTO members (membership_id, name, email, phone, class_name, department, status, is_deleted)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 0)`,
+            [membershipId, name, email, phone || null, className, department, memberStatus]
           );
           addedCount++;
           details.push({
@@ -313,10 +375,10 @@ router.get('/', async (req, res) => {
     let paramIndex = 1;
 
     if (search) {
-      query += ` AND (m.name ILIKE $${paramIndex} OR m.membership_id ILIKE $${paramIndex + 1} OR m.email ILIKE $${paramIndex + 2} OR m.department ILIKE $${paramIndex + 3})`;
+      query += ` AND (m.name ILIKE $${paramIndex} OR m.membership_id ILIKE $${paramIndex + 1} OR m.email ILIKE $${paramIndex + 2} OR m.department ILIKE $${paramIndex + 3} OR m.class_name ILIKE $${paramIndex + 4})`;
       const s = `%${search}%`;
-      params.push(s, s, s, s);
-      paramIndex += 4;
+      params.push(s, s, s, s, s);
+      paramIndex += 5;
     }
 
     query += ` GROUP BY m.id ORDER BY m.created_at DESC`;
@@ -332,7 +394,7 @@ router.get('/', async (req, res) => {
 // POST /api/members (Admin only: Add new member or restore soft-deleted member)
 router.post('/', authenticateAdmin, async (req, res) => {
   try {
-    const { membership_id, name, email, phone, department, status } = req.body;
+    const { membership_id, name, email, phone, class_name, department, status, membership_expiry_date } = req.body;
 
     console.log('[MemberRoutes] ➕ POST /api/members payload:', req.body);
 
@@ -353,8 +415,8 @@ router.post('/', authenticateAdmin, async (req, res) => {
     if (existing && existing.is_deleted) {
       // Restore previously soft-deleted member with new information
       await db.run(
-        `UPDATE members SET name = $1, email = $2, phone = $3, department = $4, status = $5, is_deleted = 0 WHERE id = $6`,
-        [name.trim(), email.trim(), phone ? phone.trim() : null, department.trim(), memberStatus, existing.id]
+        `UPDATE members SET name = $1, email = $2, phone = $3, class_name = $4, department = $5, status = $6, membership_expiry_date = $7, is_deleted = 0 WHERE id = $8`,
+        [name.trim(), email.trim(), phone ? phone.trim() : null, class_name?.trim() || '', department.trim(), memberStatus, membership_expiry_date || null, existing.id]
       );
       const restoredMember = await db.get('SELECT * FROM members WHERE id = $1', [existing.id]);
       console.log(`[MemberRoutes] 🔄 Restored soft-deleted member: ID=${existing.id}, MembershipID="${membership_id}"`);
@@ -362,8 +424,8 @@ router.post('/', authenticateAdmin, async (req, res) => {
     }
 
     const result = await db.run(
-      `INSERT INTO members (membership_id, name, email, phone, department, status, is_deleted) VALUES ($1, $2, $3, $4, $5, $6, 0) RETURNING id`,
-      [membership_id.trim(), name.trim(), email.trim(), phone ? phone.trim() : null, department.trim(), memberStatus]
+      `INSERT INTO members (membership_id, name, email, phone, class_name, department, status, membership_expiry_date, is_deleted) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0) RETURNING id`,
+      [membership_id.trim(), name.trim(), email.trim(), phone ? phone.trim() : null, class_name?.trim() || '', department.trim(), memberStatus, membership_expiry_date || null]
     );
 
     const newMember = await db.get('SELECT * FROM members WHERE id = $1', [result.lastID]);
@@ -380,6 +442,31 @@ router.post('/', authenticateAdmin, async (req, res) => {
 });
 
 // ── PARAMETERIZED /:id ROUTES (Must be placed AFTER specific named routes) ──
+
+// PATCH /api/members/:id/renew (Admin: renew membership to a chosen expiry date)
+router.patch('/:id/renew', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { membership_expiry_date } = req.body;
+    if (!membership_expiry_date || Number.isNaN(Date.parse(membership_expiry_date))) {
+      return res.status(400).json({ error: 'A valid membership expiry date is required.' });
+    }
+    const db = getDbClient();
+    const result = await db.run(
+      `UPDATE members
+       SET membership_expiry_date = $1, last_renewed_at = CURRENT_TIMESTAMP, status = 'active'
+       WHERE id = $2 AND (is_deleted IS NULL OR is_deleted = 0)
+       RETURNING id`,
+      [membership_expiry_date, id]
+    );
+    if (!result.rowCount) return res.status(404).json({ error: 'Member not found.' });
+    const member = await db.get('SELECT * FROM members WHERE id = $1', [id]);
+    return res.json({ message: 'Membership renewed successfully.', member });
+  } catch (error) {
+    console.error('[MemberRoutes] Error renewing member:', error);
+    return res.status(500).json({ error: 'Failed to renew membership.' });
+  }
+});
 
 // GET /api/members/:id (Detailed view with member rental history)
 router.get('/:id', async (req, res) => {
@@ -411,7 +498,7 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { membership_id, name, email, phone, department, status } = req.body;
+    const { membership_id, name, email, phone, class_name, department, status, membership_expiry_date } = req.body;
 
     console.log(`[MemberRoutes] ✏️ PUT /api/members/${id} payload:`, req.body);
 
@@ -442,8 +529,8 @@ router.put('/:id', authenticateAdmin, async (req, res) => {
     }
 
     await db.run(
-      `UPDATE members SET membership_id = $1, name = $2, email = $3, phone = $4, department = $5, status = $6 WHERE id = $7`,
-      [membership_id.trim(), name.trim(), email.trim(), phone ? phone.trim() : null, department.trim(), memberStatus, id]
+      `UPDATE members SET membership_id = $1, name = $2, email = $3, phone = $4, class_name = $5, department = $6, status = $7, membership_expiry_date = $8 WHERE id = $9`,
+      [membership_id.trim(), name.trim(), email.trim(), phone ? phone.trim() : null, class_name?.trim() || '', department.trim(), memberStatus, membership_expiry_date || null, id]
     );
 
     // Sync borrower contact info for all active/unreturned rentals for this member

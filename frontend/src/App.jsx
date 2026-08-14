@@ -5,7 +5,7 @@ import PublicCatalog from './components/PublicCatalog';
 import AdminDashboard from './components/admin/AdminDashboard';
 import AdminLoginModal from './components/AdminLoginModal';
 import { Toaster } from 'react-hot-toast';
-import { Cpu } from 'lucide-react';
+import { LoaderCircle } from 'lucide-react';
 
 // Protected Route Guard for Admin Portal
 function ProtectedAdminRoute({ children, onUnauthorized }) {
@@ -21,8 +21,8 @@ function ProtectedAdminRoute({ children, onUnauthorized }) {
   if (loading) {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center text-warm-gray">
-        <Cpu className="w-10 h-10 animate-spin text-terracotta mb-3" />
-        <p className="text-sm font-semibold text-warm-charcoal">Verifying Admin Session...</p>
+        <LoaderCircle className="mb-3 h-6 w-6 animate-spin text-terracotta" />
+        <p className="text-sm font-semibold text-warm-charcoal">Checking session…</p>
       </div>
     );
   }
@@ -67,11 +67,8 @@ function MainApp() {
   if (loading) {
     return (
       <div className="min-h-screen bg-warm-bg flex flex-col items-center justify-center text-warm-gray">
-        <div className="p-4 bg-terracotta-light text-terracotta rounded-2xl border border-terracotta-border shadow-sm animate-pulse mb-4">
-          <Cpu className="w-10 h-10 animate-spin" />
-        </div>
-        <p className="text-sm font-semibold text-warm-charcoal">Verifying Admin Session...</p>
-        <p className="text-xs text-warm-subtle mt-1">Restoring portal state from local storage</p>
+        <LoaderCircle className="mb-3 h-6 w-6 animate-spin text-terracotta" />
+        <p className="text-sm font-semibold text-warm-charcoal">Checking session…</p>
       </div>
     );
   }
@@ -108,7 +105,7 @@ function MainApp() {
       />
 
       {/* Main Content View Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-8 sm:pb-12">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-8 pt-6 sm:px-6 lg:px-8">
         {currentView === 'admin' ? (
           <ProtectedAdminRoute
             onUnauthorized={() => {
@@ -125,7 +122,7 @@ function MainApp() {
       {/* Footer */}
       <footer className="border-t border-warm-border bg-warm-surface py-6 text-center text-xs text-warm-gray">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-center gap-2">
-          <p>© {new Date().getFullYear()} IEEE Student Branch • College Inventory & Component Management System</p>
+          <p>© {new Date().getFullYear()} IEEE MACE SB · Inventory and member services</p>
         </div>
       </footer>
 

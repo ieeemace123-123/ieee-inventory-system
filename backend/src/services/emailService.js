@@ -16,12 +16,12 @@ export async function sendRentalConfirmationEmail({ memberName, memberEmail, mem
     `  Member ID : ${membershipId}\n\n` +
     `Please return it to the IEEE Component Lab on or before the due date.\n\n` +
     `Thank you!\n` +
-    `IEEE Student Branch — Inventory & Component Lab`;
+    `IEEE MACE SB — Inventory & Component Lab`;
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
       <div style="background: linear-gradient(135deg, #006699, #0088cc); color: white; padding: 18px 20px; border-radius: 6px 6px 0 0; text-align: center;">
-        <h2 style="margin: 0; font-size: 20px;">IEEE Student Branch</h2>
+        <h2 style="margin: 0; font-size: 20px;">IEEE MACE SB</h2>
         <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9;">Rental Confirmation Notice</p>
       </div>
 
@@ -61,7 +61,7 @@ export async function sendRentalConfirmationEmail({ memberName, memberEmail, mem
       </div>
 
       <div style="background-color: #f7fafc; padding: 12px; text-align: center; font-size: 12px; color: #a0aec0; border-radius: 0 0 6px 6px; border-top: 1px solid #e2e8f0;">
-        IEEE Student Branch • Inventory &amp; Component Lab
+        IEEE MACE SB • Inventory &amp; Component Lab
       </div>
     </div>
   `;
@@ -86,13 +86,13 @@ export async function sendReturnReminderEmail({ memberName, memberEmail, members
     `  Member ID : ${membershipId}\n\n` +
     `Please return it to the IEEE Component Lab on or before the due date so other members can access it.\n\n` +
     `Thank you for your cooperation!\n` +
-    `IEEE Student Branch — Inventory & Component Lab`;
+    `IEEE MACE SB — Inventory & Component Lab`;
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
       <!-- Header -->
       <div style="background: linear-gradient(135deg, #006699, #0088cc); color: white; padding: 18px 20px; border-radius: 6px 6px 0 0; text-align: center;">
-        <h2 style="margin: 0; font-size: 20px;">IEEE Student Branch</h2>
+        <h2 style="margin: 0; font-size: 20px;">IEEE MACE SB</h2>
         <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9;">Inventory &amp; Component Lab</p>
       </div>
 
@@ -140,7 +140,7 @@ export async function sendReturnReminderEmail({ memberName, memberEmail, members
 
       <!-- Footer -->
       <div style="background-color: #f7fafc; padding: 12px; text-align: center; font-size: 12px; color: #a0aec0; border-radius: 0 0 6px 6px; border-top: 1px solid #e2e8f0;">
-        IEEE Student Branch • Inventory &amp; Component Lab &nbsp;|&nbsp; This is an automated notification.
+        IEEE MACE SB • Inventory &amp; Component Lab &nbsp;|&nbsp; This is an automated notification.
       </div>
     </div>
   `;
@@ -174,13 +174,13 @@ export async function sendOverdueNoticeEmail({ memberName, memberEmail, membersh
     `  Member ID    : ${membershipId}\n\n` +
     `Prompt return is essential so that other members can access lab resources.\n` +
     `If you have already returned it, please disregard this notice.\n\n` +
-    `IEEE Student Branch — Inventory & Component Lab`;
+    `IEEE MACE SB — Inventory & Component Lab`;
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
       <!-- Header -->
       <div style="background: linear-gradient(135deg, #c53030, #e53e3e); color: white; padding: 18px 20px; border-radius: 6px 6px 0 0; text-align: center;">
-        <h2 style="margin: 0; font-size: 20px;">IEEE Student Branch</h2>
+        <h2 style="margin: 0; font-size: 20px;">IEEE MACE SB</h2>
         <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9;">Overdue Component Notice</p>
       </div>
 
@@ -233,7 +233,7 @@ export async function sendOverdueNoticeEmail({ memberName, memberEmail, membersh
 
       <!-- Footer -->
       <div style="background-color: #fff5f5; padding: 12px; text-align: center; font-size: 12px; color: #a0aec0; border-radius: 0 0 6px 6px; border-top: 1px solid #fed7d7;">
-        IEEE Student Branch • Inventory &amp; Component Lab &nbsp;|&nbsp; This is an automated notification.
+        IEEE MACE SB • Inventory &amp; Component Lab &nbsp;|&nbsp; This is an automated notification.
       </div>
     </div>
   `;
@@ -256,11 +256,11 @@ export async function sendOverdueNoticeEmail({ memberName, memberEmail, membersh
  */
 export async function sendOverdueNotificationEmail({ memberName, memberEmail, membershipId, itemName, returnDueDate }) {
   const subject = `[OVERDUE RENTAL NOTICE] Action Required: Return ${itemName}`;
-  const text = `Dear ${memberName},\n\nPlease return the item "${itemName}". The expected return due date (${returnDueDate}) has arrived/passed.\nYour Registered Membership ID: ${membershipId}\n\nThank you,\nIEEE Student Branch Inventory Team`;
+  const text = `Dear ${memberName},\n\nPlease return the item "${itemName}". The expected return due date (${returnDueDate}) has arrived/passed.\nYour Registered Membership ID: ${membershipId}\n\nThank you,\nIEEE MACE SB Inventory Team`;
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
       <div style="background-color: #006699; color: white; padding: 15px; border-radius: 6px 6px 0 0; text-align: center;">
-        <h2 style="margin: 0;">IEEE Student Branch</h2>
+        <h2 style="margin: 0;">IEEE MACE SB</h2>
         <p style="margin: 5px 0 0 0; font-size: 14px;">Inventory Rental Overdue Alert</p>
       </div>
       <div style="padding: 20px; color: #2d3748;">
@@ -275,7 +275,7 @@ export async function sendOverdueNotificationEmail({ memberName, memberEmail, me
         <p>Thank you for your cooperation!</p>
       </div>
       <div style="background-color: #f7fafc; padding: 10px; text-align: center; font-size: 12px; color: #718096; border-radius: 0 0 6px 6px;">
-        IEEE Student Branch • Inventory &amp; Component Lab
+        IEEE MACE SB • Inventory &amp; Component Lab
       </div>
     </div>
   `;

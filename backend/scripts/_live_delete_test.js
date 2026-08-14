@@ -19,7 +19,7 @@ async function getAdminToken() {
   const res = await fetch(`${BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'admin', password: 'admin123' })
+    body: JSON.stringify({ username: process.env.ADMIN_USERNAME || 'admin', password: process.env.ADMIN_PASSWORD })
   });
   if (!res.ok) {
     const txt = await res.text();
