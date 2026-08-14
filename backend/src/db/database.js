@@ -132,6 +132,20 @@ export async function initDb() {
         [adminUsername, passwordHash]
       );
       console.log(`[Database] Initial administrator created: ${adminUsername}`);
+    } else {
+      const storedAdmin = await db.get(
+        'SELECT password_hash FROM admins WHERE id = $1',
+        [existingAdmin.id]
+      );
+      const passwordMatches = await bcrypt.compare(adminPassword, storedAdmin.password_hash);
+      if (!passwordMatches) {
+        const passwordHash = await bcrypt.hash(adminPassword, 12);
+        await db.run(
+          'UPDATE admins SET password_hash = $1 WHERE id = $2',
+          [passwordHash, existingAdmin.id]
+        );
+        console.log(`[Database] Administrator credential synchronized: ${adminUsername}`);
+      }
     }
   } else {
     const adminCount = await db.get('SELECT COUNT(*)::int AS count FROM admins');
