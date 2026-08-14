@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import api from '../services/api';
-import { Check, ExternalLink, Package, RefreshCw, Search, X } from 'lucide-react';
+import { ArrowRight, Check, ExternalLink, Package, Search, X } from 'lucide-react';
 
 const VALIDATOR_URL = 'https://services24.ieee.org/membership-validator.html';
 
@@ -10,20 +10,26 @@ export default function PublicCatalog() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const response = await api.get('/items', { params: { search, category } });
       setItems(response.data);
+    } catch {
+      setError('Inventory is unavailable right now. Please try again.');
     } finally {
       setLoading(false);
     }
   }, [search, category]);
 
   useEffect(() => {
-    api.get('/items/categories').then(({ data }) => setCategories(['All', ...data]));
+    api.get('/items/categories')
+      .then(({ data }) => setCategories(data))
+      .catch(() => setCategories([]));
   }, []);
 
   useEffect(() => {
@@ -31,85 +37,122 @@ export default function PublicCatalog() {
     return () => clearTimeout(timer);
   }, [fetchItems]);
 
-  const availableCount = useMemo(() => items.filter(item => item.available_qty > 0).length, [items]);
-
   return (
-    <div className="space-y-6 pb-10">
-      <section className="grid gap-5 border-b border-warm-border pb-6 md:grid-cols-[1fr_auto] md:items-end">
-        <div>
-          <p className="mb-2 text-sm font-semibold text-terracotta">IEEE MACE SB</p>
-          <h1 className="max-w-3xl text-3xl font-bold tracking-tight text-warm-charcoal sm:text-4xl">Equipment, without the clutter.</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-warm-gray">Check live availability for components and lab equipment managed by the IEEE MACE Student Branch.</p>
-        </div>
-        <a href={VALIDATOR_URL} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-lg border border-terracotta-border bg-terracotta-light px-4 py-2.5 text-sm font-semibold text-terracotta hover:bg-white">
-          Verify IEEE membership <ExternalLink className="h-4 w-4" />
-        </a>
+    <div className="mx-auto max-w-5xl pb-12">
+      <section className="border-b border-warm-border py-8 sm:py-12">
+        <p className="text-sm font-semibold text-terracotta">IEEE MACE SB</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-warm-charcoal sm:text-4xl">Borrow equipment</h1>
+        <p className="mt-3 max-w-xl text-sm leading-6 text-warm-gray">Find an available item and verify your IEEE membership. An admin will complete the rental.</p>
+
+        <ol className="mt-7 grid max-w-2xl gap-3 text-sm sm:grid-cols-3" aria-label="How to borrow equipment">
+          {[
+            ['1', 'Choose an item'],
+            ['2', 'Verify membership'],
+            ['3', 'Complete with admin']
+          ].map(([number, label]) => (
+            <li key={number} className="flex items-center gap-3 rounded-lg border border-warm-border bg-white px-3 py-2.5">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-terracotta-light text-xs font-bold text-terracotta">{number}</span>
+              <span className="font-medium text-warm-charcoal">{label}</span>
+            </li>
+          ))}
+        </ol>
       </section>
 
-      <div className="flex flex-wrap items-center gap-3 text-sm text-warm-gray">
-        <span><strong className="text-warm-charcoal">{items.length}</strong> item types</span>
-        <span className="text-warm-border">•</span>
-        <span><strong className="text-warm-success">{availableCount}</strong> currently available</span>
-      </div>
-
-      <section className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_auto]">
-        <label className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-warm-subtle" />
-          <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search inventory" className="w-full rounded-lg border border-warm-border bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-terracotta" />
-        </label>
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {categories.map(value => (
-            <button key={value} onClick={() => setCategory(value)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium ${category === value ? 'bg-terracotta text-white' : 'border border-warm-border bg-white text-warm-gray hover:bg-warm-muted'}`}>
-              {value}
-            </button>
-          ))}
-          <button onClick={fetchItems} className="rounded-lg border border-warm-border p-2 text-warm-gray hover:bg-warm-muted" aria-label="Refresh inventory">
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+      <section className="pt-7">
+        <div className="mb-4 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-terracotta">Step 1</p>
+            <h2 className="mt-1 text-xl font-semibold text-warm-charcoal">Choose an item</h2>
+          </div>
         </div>
+
+        <div className="grid gap-3 rounded-xl border border-warm-border bg-white p-3 sm:grid-cols-[1fr_220px]">
+          <label className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-warm-subtle" />
+            <input
+              value={search}
+              onChange={event => setSearch(event.target.value)}
+              placeholder="Search equipment"
+              className="w-full rounded-lg border border-warm-border bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-terracotta"
+            />
+          </label>
+          <select
+            value={category}
+            onChange={event => setCategory(event.target.value)}
+            aria-label="Filter by category"
+            className="rounded-lg border border-warm-border bg-white px-3 py-2.5 text-sm text-warm-charcoal outline-none focus:border-terracotta"
+          >
+            <option value="All">All categories</option>
+            {categories.map(value => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </div>
+
+        {error ? (
+          <div className="mt-4 rounded-xl border border-warm-danger-border bg-warm-danger-bg p-5 text-sm text-warm-danger">
+            {error} <button onClick={fetchItems} className="ml-1 font-semibold underline">Try again</button>
+          </div>
+        ) : loading ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {[1, 2, 3, 4].map(index => <div key={index} className="h-24 animate-pulse rounded-xl border border-warm-border bg-white" />)}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="mt-4 rounded-xl border border-dashed border-warm-border bg-white p-8 text-center text-sm text-warm-gray">No matching equipment.</div>
+        ) : (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {items.map(item => {
+              const available = item.available_qty > 0;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setSelectedItem(item)}
+                  className="group flex items-center justify-between gap-4 rounded-xl border border-warm-border bg-white p-4 text-left transition hover:border-terracotta-border"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-warm-charcoal">{item.name}</p>
+                    <p className="mt-1 text-xs text-warm-gray">{item.category}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className={`text-xs font-medium ${available ? 'text-warm-success' : 'text-warm-danger'}`}>
+                      {available ? `${item.available_qty} available` : 'Unavailable'}
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-warm-subtle transition group-hover:translate-x-0.5 group-hover:text-terracotta" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </section>
-
-      {loading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map(index => <div key={index} className="h-36 animate-pulse rounded-xl border border-warm-border bg-white" />)}
-        </div>
-      ) : items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-warm-border bg-white p-10 text-center text-sm text-warm-gray">No items match the current filters.</div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map(item => (
-            <button key={item.id} onClick={() => setSelectedItem(item)} className="group rounded-xl border border-warm-border bg-white p-4 text-left transition hover:border-terracotta-border">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-warm-charcoal">{item.name}</p>
-                  <p className="mt-1 text-xs text-warm-gray">{item.category}</p>
-                </div>
-                <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${item.available_qty > 0 ? 'bg-warm-success-bg text-warm-success' : 'bg-warm-danger-bg text-warm-danger'}`}>
-                  {item.available_qty > 0 ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                  {item.available_qty > 0 ? `${item.available_qty} available` : 'Unavailable'}
-                </span>
-              </div>
-              <p className="mt-4 line-clamp-2 text-xs leading-5 text-warm-gray">{item.description || 'No description available.'}</p>
-            </button>
-          ))}
-        </div>
-      )}
 
       {selectedItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-warm-charcoal/30 p-4" onClick={() => setSelectedItem(null)}>
-          <div className="w-full max-w-md rounded-xl border border-warm-border bg-white p-5" onClick={event => event.stopPropagation()}>
+          <div className="w-full max-w-md rounded-2xl border border-warm-border bg-white p-5" onClick={event => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-medium text-terracotta">{selectedItem.category}</p>
-                <h2 className="mt-1 text-xl font-bold text-warm-charcoal">{selectedItem.name}</h2>
+                <p className="text-xs font-semibold uppercase tracking-wide text-terracotta">Item selected</p>
+                <h2 className="mt-1 text-xl font-semibold text-warm-charcoal">{selectedItem.name}</h2>
+                <p className="mt-1 text-xs text-warm-gray">{selectedItem.category}</p>
               </div>
-              <button onClick={() => setSelectedItem(null)} className="rounded-lg p-1.5 text-warm-gray hover:bg-warm-muted"><X className="h-4 w-4" /></button>
+              <button onClick={() => setSelectedItem(null)} className="rounded-lg p-1.5 text-warm-gray hover:bg-warm-muted" aria-label="Close"><X className="h-4 w-4" /></button>
             </div>
-            <p className="mt-4 text-sm leading-6 text-warm-gray">{selectedItem.description || 'No description available.'}</p>
-            <div className="mt-5 flex items-center gap-2 border-t border-warm-border pt-4 text-sm">
-              <Package className="h-4 w-4 text-terracotta" />
-              <strong>{selectedItem.available_qty}</strong> available of {selectedItem.total_qty}
+
+            {selectedItem.description && <p className="mt-4 text-sm leading-6 text-warm-gray">{selectedItem.description}</p>}
+
+            <div className={`mt-5 flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm ${selectedItem.available_qty > 0 ? 'bg-warm-success-bg text-warm-success' : 'bg-warm-danger-bg text-warm-danger'}`}>
+              {selectedItem.available_qty > 0 ? <Check className="h-4 w-4" /> : <Package className="h-4 w-4" />}
+              {selectedItem.available_qty > 0 ? `${selectedItem.available_qty} currently available` : 'This item is currently unavailable'}
             </div>
+
+            {selectedItem.available_qty > 0 && (
+              <div className="mt-5 border-t border-warm-border pt-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-terracotta">Step 2</p>
+                <p className="mt-1 text-sm font-semibold text-warm-charcoal">Verify your IEEE membership</p>
+                <a href={VALIDATOR_URL} target="_blank" rel="noreferrer" className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-terracotta px-4 py-2.5 text-sm font-semibold text-white hover:bg-terracotta-hover">
+                  Open membership validator <ExternalLink className="h-4 w-4" />
+                </a>
+                <p className="mt-3 text-center text-xs text-warm-gray">Then ask an inventory admin to complete the rental.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
