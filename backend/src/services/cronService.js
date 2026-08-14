@@ -41,7 +41,7 @@ export async function triggerReminderCheck() {
     SELECT r.id AS rental_id,
            r.date_taken::text AS date_taken,
            r.return_due_date::text AS return_due_date,
-           r.quantity,
+           r.quantity, r.last_renewed_at,
            m.name AS member_name,
            COALESCE(NULLIF(r.borrower_email, ''), m.email) AS member_email,
            m.membership_id,
@@ -62,7 +62,8 @@ export async function triggerReminderCheck() {
     const alreadySent = await db.get(`
       SELECT id FROM email_notifications
       WHERE rental_id = $1 AND type = 'reminder' AND sent_at = CURRENT_DATE
-    `, [rental.rental_id]);
+        AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
+    `, [rental.rental_id, rental.last_renewed_at]);
 
     if (alreadySent) {
       console.log(`[CronService] ⏭️  Reminder already sent today for rental #${rental.rental_id}, skipping.`);
@@ -143,7 +144,7 @@ export async function triggerOverdueCheck() {
     SELECT r.id AS rental_id,
            r.date_taken::text AS date_taken,
            r.return_due_date::text AS return_due_date,
-           r.quantity, r.status,
+           r.quantity, r.status, r.last_renewed_at,
            m.name AS member_name,
            COALESCE(NULLIF(r.borrower_email, ''), m.email) AS member_email,
            m.membership_id,
@@ -173,8 +174,9 @@ export async function triggerOverdueCheck() {
       const anyPrior = await db.get(`
         SELECT id FROM email_notifications
         WHERE rental_id = $1 AND type = 'overdue'
+          AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
         LIMIT 1
-      `, [rental.rental_id]);
+      `, [rental.rental_id, rental.last_renewed_at]);
       if (anyPrior) {
         shouldSkip = true;
       }
@@ -183,9 +185,10 @@ export async function triggerOverdueCheck() {
       const lastSent = await db.get(`
         SELECT sent_at::text AS sent_at FROM email_notifications
         WHERE rental_id = $1 AND type = 'overdue'
+          AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
         ORDER BY sent_at DESC
         LIMIT 1
-      `, [rental.rental_id]);
+      `, [rental.rental_id, rental.last_renewed_at]);
       if (lastSent && lastSent.sent_at) {
         const daysSinceLast = Math.floor(
           (new Date(todayStr) - new Date(lastSent.sent_at)) / (1000 * 60 * 60 * 24)

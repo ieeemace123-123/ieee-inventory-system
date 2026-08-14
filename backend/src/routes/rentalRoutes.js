@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { getDbClient } from '../db/database.js';
 import { authenticateAdmin } from '../middleware/auth.js';
 import { triggerOverdueCheck, triggerReminderCheck } from '../services/cronService.js';
-import { sendLowStockAdminAlert, sendRentalConfirmationEmail } from '../services/emailService.js';
+import { sendLowStockAdminAlert, sendRentalConfirmationEmail, sendRentalRenewalEmail } from '../services/emailService.js';
 import { getTodayStr } from '../utils/dateUtils.js';
 
 const router = express.Router();
@@ -52,7 +52,7 @@ router.get('/', async (req, res) => {
              r.date_taken::text as date_taken,
              r.return_due_date::text as return_due_date,
              r.date_returned::text as date_returned,
-             r.borrower_email, r.borrower_phone, r.created_at,
+             r.borrower_email, r.borrower_phone, r.renewal_count, r.last_renewed_at, r.created_at,
              i.name as item_name, i.category as item_category, i.available_qty as current_item_stock,
              m.membership_id, m.name as member_name, m.class_name as member_class,
              m.department as member_department, m.status as member_status,
@@ -154,7 +154,7 @@ router.get('/export-log', authenticateAdmin, async (req, res) => {
     const rentals = await db.all(`
       SELECT r.id,
              r.date_taken, r.return_due_date, r.date_returned,
-             r.quantity, r.status,
+             r.quantity, r.status, r.renewal_count, r.last_renewed_at,
              r.borrower_email, r.borrower_phone,
              i.name   AS item_name,
              i.category AS item_category,
@@ -183,6 +183,8 @@ router.get('/export-log', authenticateAdmin, async (req, res) => {
         'Borrower Phone': r.borrower_phone || '',
         'Issue Date':     r.date_taken,
         'Due Date':       r.return_due_date,
+        'Renewals':       r.renewal_count || 0,
+        'Last Renewed':   r.last_renewed_at ? new Date(r.last_renewed_at).toISOString() : '',
         'Return Date':    r.date_returned || '',
         'Status':         effectiveStatus
       };
@@ -214,7 +216,7 @@ router.get('/export-log', authenticateAdmin, async (req, res) => {
       '#': '', 'Item Name': '', 'Category': '', 'Quantity': '',
       'Member Name': '', 'Membership ID': '', 'Borrower Email': '',
       'Borrower Phone': '', 'Issue Date': '', 'Due Date': '',
-      'Return Date': '', 'Status': ''
+      'Renewals': '', 'Last Renewed': '', 'Return Date': '', 'Status': ''
     }];
     const wsRentals = XLSX.utils.json_to_sheet(wsRentalsData);
     wsRentals['!cols'] = [
@@ -228,6 +230,8 @@ router.get('/export-log', authenticateAdmin, async (req, res) => {
       { wch: 16 }, // Borrower Phone
       { wch: 14 }, // Issue Date
       { wch: 14 }, // Due Date
+      { wch: 10 }, // Renewals
+      { wch: 24 }, // Last Renewed
       { wch: 14 }, // Return Date
       { wch: 12 }  // Status
     ];
@@ -433,6 +437,113 @@ router.post('/', async (req, res) => {
 });
 
 
+// PATCH /api/rentals/:id/renew (Extend an active rental's due date)
+router.patch('/:id/renew', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { return_due_date } = req.body;
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    const parsedDate = datePattern.test(return_due_date || '')
+      ? new Date(`${return_due_date}T00:00:00.000Z`)
+      : null;
+    if (!parsedDate || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== return_due_date) {
+      return res.status(400).json({ error: 'A valid new due date is required.' });
+    }
+
+    const todayStr = getTodayStr();
+    if (return_due_date <= todayStr) {
+      return res.status(400).json({ error: 'The renewed due date must be after today.' });
+    }
+
+    const db = getDbClient();
+    let previousDueDate;
+    await db.transaction(async (client) => {
+      const rentalResult = await client.query(
+        `SELECT id, return_due_date::text AS return_due_date, date_returned, status
+         FROM rentals WHERE id = $1 FOR UPDATE`,
+        [id]
+      );
+      const rental = rentalResult.rows[0];
+      if (!rental) {
+        const error = new Error('Rental record not found.');
+        error.statusCode = 404;
+        throw error;
+      }
+      if (rental.date_returned !== null || rental.status === 'Returned') {
+        const error = new Error('A returned rental cannot be renewed.');
+        error.statusCode = 400;
+        throw error;
+      }
+      if (return_due_date <= rental.return_due_date) {
+        const error = new Error(`The new due date must be after the current due date (${rental.return_due_date}).`);
+        error.statusCode = 400;
+        throw error;
+      }
+
+      previousDueDate = rental.return_due_date;
+      await client.query(
+        `UPDATE rentals
+         SET return_due_date = $1, status = 'Active',
+             renewal_count = COALESCE(renewal_count, 0) + 1,
+             last_renewed_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [return_due_date, id]
+      );
+      await client.query(
+        `INSERT INTO rental_renewals (rental_id, previous_due_date, new_due_date, renewed_by)
+         VALUES ($1, $2, $3, $4)`,
+        [id, previousDueDate, return_due_date, req.admin?.username || 'admin']
+      );
+    });
+
+    const renewedRental = await db.get(`
+      SELECT r.*, r.date_taken::text AS date_taken,
+             r.return_due_date::text AS return_due_date,
+             r.date_returned::text AS date_returned,
+             i.name AS item_name, i.category AS item_category,
+             m.membership_id, m.name AS member_name,
+             COALESCE(NULLIF(r.borrower_email, ''), m.email) AS member_email
+      FROM rentals r
+      JOIN items i ON r.item_id = i.id
+      JOIN members m ON r.member_id = m.id
+      WHERE r.id = $1
+    `, [id]);
+
+    let emailResult = null;
+    try {
+      emailResult = await Promise.race([
+        sendRentalRenewalEmail({
+          memberName: renewedRental.member_name,
+          memberEmail: renewedRental.member_email,
+          membershipId: renewedRental.membership_id,
+          itemName: renewedRental.item_name,
+          previousDueDate,
+          newDueDate: return_due_date
+        }),
+        new Promise(resolve => setTimeout(() => resolve({ queued: true }), 750))
+      ]);
+    } catch (mailError) {
+      console.error(`[RentalRoutes] Renewal email failed for rental #${id}:`, mailError);
+      emailResult = { success: false, error: mailError.message };
+    }
+
+    return res.json({
+      message: 'Rental renewed successfully.',
+      rental: renewedRental,
+      renewal: { previous_due_date: previousDueDate, new_due_date: return_due_date },
+      email_status: {
+        queued: emailResult?.queued || false,
+        sent: emailResult?.success || false,
+        error: emailResult?.error || null
+      }
+    });
+  } catch (error) {
+    console.error('Error renewing rental:', error);
+    return res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Failed to renew rental.' });
+  }
+});
+
+
 // POST /api/rentals/:id/return (Mark rental as Returned)
 router.post('/:id/return', async (req, res) => {
   try {
@@ -577,6 +688,7 @@ router.get('/overdue-status', async (req, res) => {
              (
                SELECT sent_at::text FROM email_notifications
                WHERE rental_id = r.id AND type = 'overdue'
+                 AND (r.last_renewed_at IS NULL OR created_at >= r.last_renewed_at)
                ORDER BY sent_at DESC LIMIT 1
              ) AS last_overdue_email_sent
       FROM rentals r

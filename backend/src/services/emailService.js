@@ -69,6 +69,36 @@ export async function sendRentalConfirmationEmail({ memberName, memberEmail, mem
   return sendMail({ to: memberEmail, subject, text, html });
 }
 
+/** Send confirmation when an active rental's return deadline is extended. */
+export async function sendRentalRenewalEmail({ memberName, memberEmail, membershipId, itemName, previousDueDate, newDueDate }) {
+  const subject = `Rental Renewed: ${itemName} is now due ${newDueDate}`;
+  const text =
+    `Dear ${memberName},\n\n` +
+    `Your rental of "${itemName}" has been renewed.\n\n` +
+    `  Previous Due Date : ${previousDueDate}\n` +
+    `  New Due Date      : ${newDueDate}\n` +
+    `  Member ID         : ${membershipId}\n\n` +
+    `Please return the item on or before the new due date.\n\n` +
+    `IEEE MACE SB — Inventory & Component Lab`;
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#2d3748">
+      <div style="background:#006699;color:white;padding:18px 20px;border-radius:8px 8px 0 0;text-align:center">
+        <h2 style="margin:0">IEEE MACE SB</h2><p style="margin:6px 0 0">Rental Renewal Confirmation</p>
+      </div>
+      <div style="border:1px solid #e2e8f0;border-top:0;padding:22px 20px;border-radius:0 0 8px 8px">
+        <p>Dear <strong>${memberName}</strong>,</p>
+        <p>Your rental of <strong>${itemName}</strong> has been renewed.</p>
+        <table style="width:100%;background:#ebf8ff;border-radius:6px;padding:14px">
+          <tr><td style="padding:5px;color:#718096">Previous due date</td><td style="padding:5px">${previousDueDate}</td></tr>
+          <tr><td style="padding:5px;color:#718096">New due date</td><td style="padding:5px;font-weight:bold;color:#c05621">${newDueDate}</td></tr>
+          <tr><td style="padding:5px;color:#718096">Membership ID</td><td style="padding:5px;font-family:monospace">${membershipId}</td></tr>
+        </table>
+        <p>Please return the item on or before the new due date.</p>
+      </div>
+    </div>`;
+  return sendMail({ to: memberEmail, subject, text, html });
+}
+
 /**
  * Send a return reminder email to the member N days before the due date.
  * (N is configurable via REMINDER_DAYS_BEFORE in .env, default: 1)

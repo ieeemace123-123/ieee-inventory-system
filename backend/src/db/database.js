@@ -234,6 +234,8 @@ export async function initDb() {
       status TEXT NOT NULL CHECK(status IN ('Active', 'Returned', 'Overdue')),
       borrower_email TEXT DEFAULT '',
       borrower_phone TEXT DEFAULT '',
+      renewal_count INTEGER NOT NULL DEFAULT 0,
+      last_renewed_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE RESTRICT,
       FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE RESTRICT
@@ -260,6 +262,21 @@ export async function initDb() {
     console.log('[Database] ✅ Added `borrower_phone` column to rentals table.');
   }
 
+  await db.query(`ALTER TABLE rentals ADD COLUMN IF NOT EXISTS renewal_count INTEGER NOT NULL DEFAULT 0;`);
+  await db.query(`ALTER TABLE rentals ADD COLUMN IF NOT EXISTS last_renewed_at TIMESTAMPTZ;`);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS rental_renewals (
+      id SERIAL PRIMARY KEY,
+      rental_id INTEGER NOT NULL,
+      previous_due_date DATE NOT NULL,
+      new_due_date DATE NOT NULL,
+      renewed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      renewed_by TEXT NOT NULL DEFAULT 'admin',
+      FOREIGN KEY (rental_id) REFERENCES rentals(id) ON DELETE CASCADE
+    );
+  `);
+
   // 5. Email Notifications Tracking Table
   await db.query(`
     CREATE TABLE IF NOT EXISTS email_notifications (
@@ -267,9 +284,12 @@ export async function initDb() {
       rental_id INTEGER NOT NULL,
       type TEXT NOT NULL CHECK(type IN ('reminder', 'overdue')),
       sent_at DATE NOT NULL DEFAULT CURRENT_DATE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (rental_id) REFERENCES rentals(id) ON DELETE CASCADE
     );
   `);
+
+  await db.query(`ALTER TABLE email_notifications ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP;`);
 
   console.log('Database initialized successfully.');
   return db;

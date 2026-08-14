@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
-import { ClipboardList, Plus, Search, RotateCcw, User, Mail, Phone, AlertTriangle, CheckCircle2, Clock, Info, Send, Trash2, AlertCircle, ExternalLink } from 'lucide-react';
+import { ClipboardList, Plus, Search, RotateCcw, User, Mail, Phone, AlertTriangle, CheckCircle2, Clock, Info, Send, Trash2, AlertCircle, ExternalLink, CalendarPlus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function RentalManager() {
@@ -51,6 +51,12 @@ export default function RentalManager() {
   // Delete confirmation modal
   const [deletingRental, setDeletingRental]         = useState(null);
   const [deleteRentalLoading, setDeleteRentalLoading] = useState(false);
+
+  // Rental renewal modal
+  const [renewingRental, setRenewingRental] = useState(null);
+  const [renewalDueDate, setRenewalDueDate] = useState('');
+  const [renewalError, setRenewalError] = useState('');
+  const [renewalLoading, setRenewalLoading] = useState(false);
 
   // ── Data fetching ───────────────────────────────────────────────────────────
   const fetchRentals = async () => {
@@ -284,6 +290,47 @@ export default function RentalManager() {
     }
   };
 
+  const openRentalRenewal = (rental) => {
+    const currentDue = new Date(`${rental.return_due_date}T00:00:00Z`);
+    currentDue.setUTCDate(currentDue.getUTCDate() + 7);
+    setRenewalDueDate(currentDue.toISOString().slice(0, 10));
+    setRenewalError('');
+    setRenewingRental(rental);
+  };
+
+  const handleRenewRental = async (event) => {
+    event.preventDefault();
+    if (!renewalDueDate || renewalDueDate <= renewingRental.return_due_date) {
+      setRenewalError(`Choose a date after ${renewingRental.return_due_date}.`);
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    if (renewalDueDate <= today) {
+      setRenewalError('The renewed due date must be after today.');
+      return;
+    }
+
+    setRenewalLoading(true);
+    setRenewalError('');
+    try {
+      const { data } = await api.patch(`/rentals/${renewingRental.id}/renew`, {
+        return_due_date: renewalDueDate
+      });
+      const emailNote = data.email_status?.sent
+        ? ' Confirmation email sent.'
+        : data.email_status?.queued
+          ? ' Confirmation email is being delivered.'
+          : '';
+      toast.success(`Rental renewed through ${renewalDueDate}.${emailNote}`);
+      setRenewingRental(null);
+      await fetchRentals();
+    } catch (error) {
+      setRenewalError(error.response?.data?.error || 'Failed to renew rental.');
+    } finally {
+      setRenewalLoading(false);
+    }
+  };
+
   const handleTriggerCron = async () => {
     try {
       toast.loading('Running daily overdue check & sending notifications...', { id: 'cron' });
@@ -469,13 +516,22 @@ export default function RentalManager() {
                     </button>
 
                     {!isReturned && (
-                      <button
-                        onClick={() => handleMarkReturned(r.id, r.item_name)}
-                        className="flex-1 flex items-center justify-center space-x-1 bg-warm-success hover:opacity-90 text-white font-semibold py-2 rounded-xl text-xs shadow-xs"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Return</span>
-                      </button>
+                      <>
+                        <button
+                          onClick={() => openRentalRenewal(r)}
+                          className="flex-1 flex items-center justify-center space-x-1 border border-terracotta-border bg-terracotta-light text-terracotta font-semibold py-2 rounded-xl text-xs"
+                        >
+                          <CalendarPlus className="w-3.5 h-3.5" />
+                          <span>Renew</span>
+                        </button>
+                        <button
+                          onClick={() => handleMarkReturned(r.id, r.item_name)}
+                          className="flex-1 flex items-center justify-center space-x-1 bg-warm-success hover:opacity-90 text-white font-semibold py-2 rounded-xl text-xs shadow-xs"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Return</span>
+                        </button>
+                      </>
                     )}
 
                     <button
@@ -586,13 +642,22 @@ export default function RentalManager() {
                         </button>
 
                         {!isReturned && (
-                          <button
-                            onClick={() => handleMarkReturned(r.id, r.item_name)}
-                            className="inline-flex items-center space-x-1 bg-warm-success hover:opacity-90 text-white font-semibold px-3 py-1.5 rounded-xl shadow-xs transition-all text-xs"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Return Item</span>
-                          </button>
+                          <>
+                            <button
+                              onClick={() => openRentalRenewal(r)}
+                              className="inline-flex items-center space-x-1 border border-terracotta-border bg-terracotta-light text-terracotta font-semibold px-3 py-1.5 rounded-xl transition-all text-xs"
+                            >
+                              <CalendarPlus className="w-3.5 h-3.5" />
+                              <span>Renew</span>
+                            </button>
+                            <button
+                              onClick={() => handleMarkReturned(r.id, r.item_name)}
+                              className="inline-flex items-center space-x-1 bg-warm-success hover:opacity-90 text-white font-semibold px-3 py-1.5 rounded-xl shadow-xs transition-all text-xs"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Return Item</span>
+                            </button>
+                          </>
                         )}
 
                         <button
@@ -873,6 +938,49 @@ export default function RentalManager() {
                 </button>
               </div>
 
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Renew Rental Modal */}
+      {renewingRental && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-warm-charcoal/40 p-4 backdrop-blur-sm" onClick={() => !renewalLoading && setRenewingRental(null)}>
+          <div className="w-full max-w-sm rounded-2xl border border-warm-border bg-white p-5 shadow-xl" onClick={event => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold text-terracotta"><CalendarPlus className="h-4 w-4" /> Renew rental</div>
+                <h3 className="mt-1 text-lg font-bold text-warm-charcoal">{renewingRental.item_name}</h3>
+                <p className="mt-1 text-xs text-warm-gray">Borrowed by {renewingRental.member_name}</p>
+              </div>
+              <button type="button" disabled={renewalLoading} onClick={() => setRenewingRental(null)} className="rounded-lg p-1.5 text-warm-gray hover:bg-warm-muted" aria-label="Close renewal dialog"><X className="h-4 w-4" /></button>
+            </div>
+
+            <form onSubmit={handleRenewRental} className="mt-5 space-y-4">
+              <div className="rounded-xl border border-warm-border bg-warm-muted p-3 text-xs">
+                <span className="text-warm-gray">Current due date</span>
+                <strong className="float-right text-warm-charcoal">{renewingRental.return_due_date}</strong>
+                {!!renewingRental.renewal_count && <p className="mt-2 text-warm-gray">Previously renewed {renewingRental.renewal_count} time{renewingRental.renewal_count === 1 ? '' : 's'}.</p>}
+              </div>
+              <label className="block text-sm font-semibold text-warm-charcoal">
+                New due date
+                <input
+                  type="date"
+                  required
+                  min={(() => { const date = new Date(`${renewingRental.return_due_date}T00:00:00Z`); date.setUTCDate(date.getUTCDate() + 1); return date.toISOString().slice(0, 10); })()}
+                  value={renewalDueDate}
+                  onChange={event => { setRenewalDueDate(event.target.value); setRenewalError(''); }}
+                  className="mt-2 w-full rounded-xl border border-warm-border bg-white px-3 py-2.5 text-sm outline-none focus:border-terracotta"
+                />
+              </label>
+              {renewalError && <p className="flex items-start gap-2 rounded-lg bg-warm-danger-bg p-3 text-xs text-warm-danger"><AlertCircle className="h-4 w-4 shrink-0" /> {renewalError}</p>}
+              <p className="text-xs leading-5 text-warm-gray">Renewing keeps the item issued, resets an overdue rental to Active, records the previous deadline, and starts a fresh reminder cycle.</p>
+              <div className="flex justify-end gap-2">
+                <button type="button" disabled={renewalLoading} onClick={() => setRenewingRental(null)} className="rounded-xl border border-warm-border px-4 py-2.5 text-xs font-semibold text-warm-charcoal hover:bg-warm-muted">Cancel</button>
+                <button type="submit" disabled={renewalLoading} className="inline-flex items-center gap-2 rounded-xl bg-terracotta px-4 py-2.5 text-xs font-semibold text-white hover:bg-terracotta-hover disabled:opacity-50">
+                  <CalendarPlus className="h-4 w-4" /> {renewalLoading ? 'Renewing...' : 'Confirm renewal'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
