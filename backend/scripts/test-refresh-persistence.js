@@ -22,7 +22,7 @@ async function testSessionPersistence() {
   const loginRes = await fetch(`${BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'admin', password: 'admin123' })
+    body: JSON.stringify({ username: process.env.ADMIN_USERNAME || 'admin', password: process.env.ADMIN_PASSWORD })
   });
 
   const loginData = await loginRes.json();

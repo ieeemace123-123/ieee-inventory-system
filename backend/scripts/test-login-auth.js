@@ -17,7 +17,8 @@ async function testAuthFlow() {
   console.log('🔍 TESTING LOGIN & AUTH FLOW');
   console.log('==================================================\n');
 
-  const adminPassword = process.env.ADMIN_PASSWORD || 'inventory46@64';
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) throw new Error('ADMIN_PASSWORD is required.');
   // 1. Attempt login with correct credentials
   console.log(`1. Testing POST /api/auth/login with credentials: { username: "admin", password: "${adminPassword}" }`);
   try {

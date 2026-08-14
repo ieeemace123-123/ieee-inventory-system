@@ -36,7 +36,7 @@ app.use(['/api/rentals', '/rentals'], rentalRoutes);
 app.get(['/', '/health', '/api/health'], (req, res) => {
   res.json({
     status: 'ok',
-    service: 'IEEE Inventory Rental API',
+    service: 'IEEE MACE SB Inventory API',
     timestamp: new Date().toISOString(),
     env: process.env.VERCEL ? 'vercel-serverless' : (process.env.NODE_ENV || 'development')
   });
@@ -70,7 +70,7 @@ export async function startServer() {
     if (!process.env.VERCEL) {
       app.listen(PORT, () => {
         console.log(`====================================================`);
-        console.log(`🚀 IEEE Inventory Rental Server running on port ${PORT}`);
+        console.log(`🚀 IEEE MACE SB Inventory Server running on port ${PORT}`);
         console.log(`📍 API Health: http://localhost:${PORT}/api/health`);
         console.log(`====================================================`);
       });
@@ -81,7 +81,7 @@ export async function startServer() {
   }
 }
 
-if (!process.env.VERCEL) {
+if (!process.env.VERCEL && process.argv[1] === __filename) {
   startServer();
 }
 

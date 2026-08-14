@@ -1,5 +1,6 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
 dotenv.config();
 
 const { Pool } = pg;
@@ -115,6 +116,30 @@ export async function initDb() {
     );
   `);
 
+  // Bootstrap the first administrator for a fresh deployment. Existing
+  // credentials are never overwritten during normal application startup.
+  const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (adminPassword) {
+    const existingAdmin = await db.get(
+      'SELECT id FROM admins WHERE username = $1',
+      [adminUsername]
+    );
+    if (!existingAdmin) {
+      const passwordHash = await bcrypt.hash(adminPassword, 12);
+      await db.run(
+        'INSERT INTO admins (username, password_hash) VALUES ($1, $2)',
+        [adminUsername, passwordHash]
+      );
+      console.log(`[Database] Initial administrator created: ${adminUsername}`);
+    }
+  } else {
+    const adminCount = await db.get('SELECT COUNT(*)::int AS count FROM admins');
+    if (adminCount.count === 0) {
+      console.warn('[Database] ADMIN_PASSWORD is not configured; no administrator account was created.');
+    }
+  }
+
   // 2. Members Table
   await db.query(`
     CREATE TABLE IF NOT EXISTS members (
@@ -123,8 +148,11 @@ export async function initDb() {
       name TEXT NOT NULL,
       email TEXT NOT NULL,
       phone TEXT,
+      class_name TEXT DEFAULT '',
       department TEXT NOT NULL,
       status TEXT DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
+      membership_expiry_date DATE,
+      last_renewed_at TIMESTAMPTZ,
       is_deleted INTEGER DEFAULT 0,
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
@@ -148,6 +176,22 @@ export async function initDb() {
   if (statusCheck.rowCount === 0) {
     await db.query(`ALTER TABLE members ADD COLUMN status TEXT DEFAULT 'active';`);
     console.log('[Database] Added `status` column to members table.');
+  }
+
+  const memberColumns = [
+    ['class_name', `ALTER TABLE members ADD COLUMN class_name TEXT DEFAULT '';`],
+    ['membership_expiry_date', 'ALTER TABLE members ADD COLUMN membership_expiry_date DATE;'],
+    ['last_renewed_at', 'ALTER TABLE members ADD COLUMN last_renewed_at TIMESTAMPTZ;']
+  ];
+  for (const [columnName, migrationSql] of memberColumns) {
+    const columnCheck = await db.query(
+      `SELECT 1 FROM information_schema.columns WHERE table_name = 'members' AND column_name = $1`,
+      [columnName]
+    );
+    if (columnCheck.rowCount === 0) {
+      await db.query(migrationSql);
+      console.log(`[Database] Added members.${columnName}.`);
+    }
   }
 
   // 3. Items Table

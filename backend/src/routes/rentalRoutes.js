@@ -54,7 +54,8 @@ router.get('/', async (req, res) => {
              r.date_returned::text as date_returned,
              r.borrower_email, r.borrower_phone, r.created_at,
              i.name as item_name, i.category as item_category, i.available_qty as current_item_stock,
-             m.membership_id, m.name as member_name, m.status as member_status,
+             m.membership_id, m.name as member_name, m.class_name as member_class,
+             m.department as member_department, m.status as member_status,
              r.borrower_email as member_email, r.borrower_phone as member_phone
       FROM rentals r
       JOIN items i ON r.item_id = i.id
@@ -255,6 +256,8 @@ router.post('/', async (req, res) => {
       borrower_email,
       borrower_phone,
       borrower_name,
+      borrower_class,
+      borrower_department,
       membership_id,
       quantity,
       date_taken,
@@ -277,6 +280,12 @@ router.post('/', async (req, res) => {
     if (!borrower_phone || !borrower_phone.trim()) {
       return res.status(400).json({ error: 'Phone number is required.' });
     }
+    if (!borrower_class || !borrower_class.trim()) {
+      return res.status(400).json({ error: 'Class is required.' });
+    }
+    if (!borrower_department || !borrower_department.trim()) {
+      return res.status(400).json({ error: 'Department is required.' });
+    }
     if (!return_due_date) {
       return res.status(400).json({ error: 'Return due date is required.' });
     }
@@ -297,6 +306,8 @@ router.post('/', async (req, res) => {
     const cleanName = borrower_name.trim();
     const cleanEmail = borrower_email.trim();
     const cleanPhone = borrower_phone.trim();
+    const cleanClass = borrower_class.trim();
+    const cleanDepartment = borrower_department.trim();
 
     // ── Soft lookup/register member ──────────────────────────────────────────
     let member = await db.get(
@@ -306,16 +317,16 @@ router.post('/', async (req, res) => {
 
     if (!member) {
       const newMemberResult = await db.run(
-        `INSERT INTO members (membership_id, name, email, phone, department, status, is_deleted)
-         VALUES ($1, $2, $3, $4, 'IEEE Member', 'active', 0) RETURNING id`,
-        [cleanMembershipId, cleanName, cleanEmail, cleanPhone || '']
+        `INSERT INTO members (membership_id, name, email, phone, class_name, department, status, is_deleted)
+         VALUES ($1, $2, $3, $4, $5, $6, 'active', 0) RETURNING id`,
+        [cleanMembershipId, cleanName, cleanEmail, cleanPhone || '', cleanClass, cleanDepartment]
       );
       member = { id: newMemberResult.lastID, name: cleanName };
     } else {
       // Update contact details and ensure the member is visible (un-delete if previously soft-deleted)
       await db.run(
-        `UPDATE members SET name = $1, email = $2, phone = $3, is_deleted = 0 WHERE id = $4`,
-        [cleanName, cleanEmail, cleanPhone || '', member.id]
+        `UPDATE members SET name = $1, email = $2, phone = $3, class_name = $4, department = $5, is_deleted = 0 WHERE id = $6`,
+        [cleanName, cleanEmail, cleanPhone || '', cleanClass, cleanDepartment, member.id]
       );
     }
 
@@ -335,11 +346,18 @@ router.post('/', async (req, res) => {
 
     // ── Begin transaction: decrement stock + insert rental ───────────────────
     let createdRentalId;
+    let remainingQty;
     await db.transaction(async (client) => {
-      await client.query(
-        `UPDATE items SET available_qty = available_qty - $1 WHERE id = $2`,
+      const stockUpdate = await client.query(
+        `UPDATE items SET available_qty = available_qty - $1 WHERE id = $2 AND available_qty >= $1 RETURNING available_qty`,
         [qtyNum, item_id]
       );
+      if (stockUpdate.rowCount !== 1) {
+        const error = new Error('Stock changed while issuing. Refresh and try again.');
+        error.statusCode = 409;
+        throw error;
+      }
+      remainingQty = stockUpdate.rows[0].available_qty;
 
       const rentalRes = await client.query(
         `INSERT INTO rentals
@@ -351,7 +369,6 @@ router.post('/', async (req, res) => {
     });
 
     // Trigger low-stock alert if stock hits zero
-    const remainingQty = item.available_qty - qtyNum;
     if (remainingQty <= 0) {
       sendLowStockAdminAlert({
         itemName: item.name,
@@ -368,7 +385,8 @@ router.post('/', async (req, res) => {
              r.date_returned::text as date_returned,
              r.borrower_email, r.borrower_phone, r.created_at,
              i.name as item_name, i.category as item_category,
-             m.membership_id, m.name as member_name, m.status as member_status,
+             m.membership_id, m.name as member_name, m.class_name as member_class,
+             m.department as member_department, m.status as member_status,
              r.borrower_email as member_email, r.borrower_phone as member_phone
       FROM rentals r
       JOIN items i ON r.item_id = i.id
@@ -379,7 +397,7 @@ router.post('/', async (req, res) => {
     // ── Dispatch Confirmation Email ────────────────────────────────────────────────
     let emailResult = null;
     try {
-      emailResult = await sendRentalConfirmationEmail({
+      emailResult = await Promise.race([sendRentalConfirmationEmail({
         memberName:   displayName,
         memberEmail:  cleanEmail,
         membershipId: cleanMembershipId,
@@ -387,7 +405,7 @@ router.post('/', async (req, res) => {
         quantity:     qtyNum,
         dateIssued:   takenDate,
         dueDate:      return_due_date
-      });
+      }), new Promise(resolve => setTimeout(() => resolve({ queued: true }), 750))]);
       console.log(`[RentalRoutes] Confirmation email result for "${cleanEmail}":`, emailResult);
     } catch (mailErr) {
       console.error(`[RentalRoutes] ❌ Exception dispatching confirmation email to "${cleanEmail}":`, mailErr);
@@ -397,9 +415,12 @@ router.post('/', async (req, res) => {
     return res.status(201).json({
       message: emailResult?.success
         ? 'Rental record created successfully and confirmation email sent.'
-        : `Rental record created, but confirmation email failed to send: ${emailResult?.error || 'Unknown error'}`,
+        : emailResult?.queued
+          ? 'Rental record created successfully. Email delivery is continuing in the background.'
+          : 'Rental record created, but confirmation email could not be sent.',
       rental: createdRental,
       email_status: {
+        queued: emailResult?.queued || false,
         sent: emailResult?.success || false,
         messageId: emailResult?.messageId || null,
         error: emailResult?.error || null
@@ -407,7 +428,7 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating rental:', error);
-    return res.status(500).json({ error: error.message || 'Failed to create rental record.' });
+    return res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Failed to create rental record.' });
   }
 });
 
@@ -431,16 +452,20 @@ router.post('/:id/return', async (req, res) => {
 
     // Begin Transaction to restore stock and update rental
     await db.transaction(async (client) => {
-      // 1. Increase available_qty back
+      const returnResult = await client.query(
+        `UPDATE rentals SET date_returned = $1, status = 'Returned'
+         WHERE id = $2 AND date_returned IS NULL AND status != 'Returned'
+         RETURNING item_id, quantity`,
+        [todayStr, id]
+      );
+      if (returnResult.rowCount !== 1) {
+        const error = new Error('This rental was already returned by another request.');
+        error.statusCode = 409;
+        throw error;
+      }
       await client.query(
         `UPDATE items SET available_qty = available_qty + $1 WHERE id = $2`,
-        [rental.quantity, rental.item_id]
-      );
-
-      // 2. Mark rental as returned
-      await client.query(
-        `UPDATE rentals SET date_returned = $1, status = 'Returned' WHERE id = $2`,
-        [todayStr, id]
+        [returnResult.rows[0].quantity, returnResult.rows[0].item_id]
       );
     });
 
@@ -460,7 +485,7 @@ router.post('/:id/return', async (req, res) => {
     });
   } catch (error) {
     console.error('Error processing return:', error);
-    return res.status(500).json({ error: 'Failed to process item return.' });
+    return res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Failed to process item return.' });
   }
 });
 

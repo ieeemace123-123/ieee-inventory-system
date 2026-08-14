@@ -1,33 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  /* Warm minimal palette variables */
-  --bg-main: #FAF7F2;
-  --bg-surface: #FFFFFF;
-  --bg-surface-hover: #FDFBF7;
-  --bg-muted: #F5F1EA;
-  --bg-card: #FFFFFF;
-
-  --text-main: #2B2724;
-  --text-muted: #6B625B;
-  --text-subtle: #8A8078;
-
-  --accent-main: #C1622D;
-  --accent-hover: #A75220;
-  --accent-light: #F9F3EE;
-  --accent-border: #E8CDBB;
-
-  --border-main: #E8E2D9;
-  --border-subtle: #F0EAE1;
-
-  /* Status Colors */
-  --success-text: #2E6B4A;
-  --success-bg: #EBF5EE;
-  --success-border: #C4E3D0;
-
-  --danger-text: #B93829;
-  --danger-bg: #FDF2F0;
-  --danger-border: #F6C4BE;
+  --bg-main: #f7f9fb;
+  --bg-surface: #ffffff;
+  --bg-surface-hover: #f8fafc;
+  --bg-muted: #f1f5f9;
+  --bg-card: #ffffff;
+  --text-main: #16202a;
+  --text-muted: #52606d;
+  --text-subtle: #7b8794;
+  --accent-main: #00629b;
+  --accent-hover: #004f7d;
+  --accent-light: #edf7fc;
+  --accent-border: #b9dced;
+  --border-main: #dce3e8;
+  --border-subtle: #edf1f4;
+  --success-text: #18794e;
+  --success-bg: #ecf8f1;
+  --success-border: #b9e2ca;
+  --danger-text: #b42318;
+  --danger-bg: #fff1f0;
+  --danger-border: #f4c7c3;
 }
 
 @theme {
@@ -36,59 +29,41 @@
   --color-warm-surface-hover: var(--bg-surface-hover);
   --color-warm-muted: var(--bg-muted);
   --color-warm-card: var(--bg-card);
-
   --color-warm-charcoal: var(--text-main);
   --color-warm-gray: var(--text-muted);
   --color-warm-subtle: var(--text-subtle);
-
   --color-terracotta: var(--accent-main);
   --color-terracotta-hover: var(--accent-hover);
   --color-terracotta-light: var(--accent-light);
   --color-terracotta-border: var(--accent-border);
-
   --color-warm-border: var(--border-main);
   --color-warm-border-subtle: var(--border-subtle);
-
   --color-warm-success: var(--success-text);
   --color-warm-success-bg: var(--success-bg);
   --color-warm-success-border: var(--success-border);
-
   --color-warm-danger: var(--danger-text);
   --color-warm-danger-bg: var(--danger-bg);
   --color-warm-danger-border: var(--danger-border);
 }
 
 @layer base {
+  * { box-sizing: border-box; }
   body {
-    background-color: var(--bg-main);
-    color: var(--text-main);
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    min-width: 320px;
     min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  body::selection {
-    background-color: rgba(193, 98, 45, 0.2);
+    margin: 0;
+    background: var(--bg-main);
     color: var(--text-main);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
+  button, input, select, textarea { font: inherit; }
+  ::selection { background: #cfeaf7; color: var(--text-main); }
 }
 
-/* Custom Scrollbar in Warm Minimal Palette */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+/* Keep the existing admin screens compact while their workflows remain familiar. */
+.shadow-xs, .shadow-sm, .shadow-md { box-shadow: none !important; }
+.rounded-3xl { border-radius: 1rem !important; }
 
-::-webkit-scrollbar-track {
-  background: var(--bg-main);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-main);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-subtle);
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { border-radius: 999px; background: #cbd5dc; }

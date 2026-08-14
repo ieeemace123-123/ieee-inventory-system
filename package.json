@@ -1,9 +1,9 @@
 {
-  "name": "ieee-inventory-system",
+  "name": "ieee-mace-sb",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cd frontend && npm install && npm run build",
+    "build": "npm --prefix frontend ci && npm --prefix frontend run build",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "start:backend": "cd backend && npm start",
@@ -16,8 +16,10 @@
     "express": "^5.0.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.2.0",
+    "node-cron": "^4.6.0",
+    "nodemailer": "^9.0.5",
     "pg": "^8.13.3",
     "serverless-http": "^4.0.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }

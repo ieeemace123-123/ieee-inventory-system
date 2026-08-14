@@ -54,9 +54,9 @@ STEP 1: OPEN YOUR TERMINAL IN THE PROJECT ROOT DIRECTORY
 STEP 2: VERIFY ENVIRONMENT CONFIGURATION
   Ensure the database URL and credentials are set in backend/.env:
     DATABASE_URL="postgresql://<user>:<password>@<host>:6543/postgres?pgbouncer=true"
-    JWT_SECRET="ieee_inventory_secret_jwt_key_2026_super_secure"
+    JWT_SECRET="<generate-a-long-random-secret>"
     ADMIN_USERNAME="admin"
-    ADMIN_PASSWORD="inventory46@64"
+    ADMIN_PASSWORD="<set-a-unique-strong-password>"
 
 STEP 3: SEED THE POSTGRESQL DATABASE (First-time setup or reset)
   In terminal root, execute:

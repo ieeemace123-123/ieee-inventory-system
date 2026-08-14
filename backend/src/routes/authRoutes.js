@@ -27,7 +27,11 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid username or password.' });
     }
 
-    const secret = process.env.JWT_SECRET || 'ieee_inventory_secret_jwt_key_2026_super_secure';
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      console.error('[Auth] JWT_SECRET is not configured.');
+      return res.status(503).json({ error: 'Authentication is not configured.' });
+    }
     const token = jwt.sign(
       { id: admin.id, username: admin.username },
       secret,

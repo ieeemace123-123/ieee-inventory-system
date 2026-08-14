@@ -26,7 +26,8 @@ const BASE = 'http://localhost:5000/api';
 const logSection = (t) => console.log(`\n==================================================\n🔍 ${t}\n==================================================`);
 
 async function getAdminToken() {
-  const password = process.env.ADMIN_PASSWORD || 'inventory46@64';
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password) throw new Error('ADMIN_PASSWORD is required.');
   const res = await fetch(`${BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

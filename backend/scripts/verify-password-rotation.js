@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const newPass = process.env.ADMIN_PASSWORD;
-const oldPass = 'admin123';
+const oldPass = process.env.OLD_ADMIN_PASSWORD;
 
 async function verify() {
   // Test new password
@@ -21,7 +21,7 @@ async function verify() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: 'admin', password: oldPass })
   });
-  console.log('Old password (admin123):', old.status === 401 ? 'CORRECTLY REJECTED (401 Unauthorized)' : 'SECURITY WARNING - old password still accepted!');
+  console.log('Old password:', old.status === 401 ? 'CORRECTLY REJECTED (401 Unauthorized)' : 'SECURITY WARNING - old password still accepted!');
 }
 
 verify();

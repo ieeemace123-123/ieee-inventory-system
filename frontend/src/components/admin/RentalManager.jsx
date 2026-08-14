@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
-import { ClipboardList, Plus, Search, RotateCcw, User, Mail, Phone, Calendar, AlertTriangle, CheckCircle2, Clock, Info, Send, Trash2, AlertCircle } from 'lucide-react';
+import { ClipboardList, Plus, Search, RotateCcw, User, Mail, Phone, AlertTriangle, CheckCircle2, Clock, Info, Send, Trash2, AlertCircle, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function RentalManager() {
@@ -17,6 +17,10 @@ export default function RentalManager() {
   const [borrowerName, setBorrowerName]   = useState('');
   const [borrowerEmail, setBorrowerEmail] = useState('');
   const [borrowerPhone, setBorrowerPhone] = useState('');
+  const [borrowerClass, setBorrowerClass] = useState('');
+  const [borrowerDepartment, setBorrowerDepartment] = useState('');
+  const [memberSuggestions, setMemberSuggestions] = useState([]);
+  const [selectedMemberId, setSelectedMemberId] = useState(null);
 
   // IEEE Membership ID — stored as-is, no verification
   const [membershipIdInput, setMembershipIdInput] = useState('');
@@ -73,6 +77,33 @@ export default function RentalManager() {
   };
 
   useEffect(() => { fetchItems(); }, []);
+
+  useEffect(() => {
+    if (!isCreateModalOpen || selectedMemberId || borrowerName.trim().length < 2) {
+      setMemberSuggestions([]);
+      return undefined;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await api.get('/members', { params: { search: borrowerName.trim() } });
+        setMemberSuggestions(data.slice(0, 6));
+      } catch {
+        setMemberSuggestions([]);
+      }
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [borrowerName, isCreateModalOpen, selectedMemberId]);
+
+  const selectMember = (member) => {
+    setSelectedMemberId(member.id);
+    setBorrowerName(member.name || '');
+    setBorrowerEmail(member.email || '');
+    setBorrowerPhone(member.phone || '');
+    setBorrowerClass(member.class_name || '');
+    setBorrowerDepartment(member.department || '');
+    setMembershipIdInput(member.membership_id || '');
+    setMemberSuggestions([]);
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => fetchRentals(), 200);
@@ -142,6 +173,10 @@ export default function RentalManager() {
     setBorrowerName('');
     setBorrowerEmail('');
     setBorrowerPhone('');
+    setBorrowerClass('');
+    setBorrowerDepartment('');
+    setMemberSuggestions([]);
+    setSelectedMemberId(null);
     setMembershipIdInput('');
     setSelectedItemId('');
     setQuantity(1);
@@ -181,6 +216,10 @@ export default function RentalManager() {
       setCreateError('Phone number must be exactly 10 digits.');
       return;
     }
+    if (!borrowerClass.trim() || !borrowerDepartment.trim()) {
+      setCreateError('Class and department are required.');
+      return;
+    }
     if (!selectedItemId) {
       setCreateError('Please select an inventory item.');
       return;
@@ -202,6 +241,8 @@ export default function RentalManager() {
         borrower_name:   borrowerName.trim(),
         borrower_email:  borrowerEmail.trim(),
         borrower_phone:  borrowerPhone.trim(),
+        borrower_class:  borrowerClass.trim(),
+        borrower_department: borrowerDepartment.trim(),
         quantity:        Number(quantity),
         date_taken:      dateTaken,
         return_due_date: returnDueDate
@@ -210,6 +251,8 @@ export default function RentalManager() {
       const emailStatus = res.data?.email_status;
       if (emailStatus?.sent) {
         toast.success(`Rental issued! Confirmation email sent to ${borrowerEmail.trim()}`);
+      } else if (emailStatus?.queued) {
+        toast.success('Rental issued. Confirmation email is being delivered.');
       } else if (emailStatus?.error) {
         toast.error(`Rental saved, but confirmation email failed: ${emailStatus.error}`, { duration: 6000 });
       } else {
@@ -615,9 +658,20 @@ export default function RentalManager() {
                       required
                       placeholder="e.g. Arun Kumar"
                       value={borrowerName}
-                      onChange={(e) => setBorrowerName(e.target.value)}
+                      onChange={(e) => { setBorrowerName(e.target.value); setSelectedMemberId(null); }}
+                      autoComplete="off"
                       className="w-full bg-warm-surface border border-warm-border rounded-xl py-2.5 pl-9 pr-3 text-sm text-warm-charcoal focus:outline-none focus:border-terracotta transition-colors"
                     />
+                    {memberSuggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-warm-border bg-white shadow-lg">
+                        {memberSuggestions.map(member => (
+                          <button key={member.id} type="button" onClick={() => selectMember(member)} className="block w-full border-b border-warm-border-subtle px-3 py-2 text-left hover:bg-warm-muted last:border-0">
+                            <span className="block text-xs font-semibold text-warm-charcoal">{member.name}</span>
+                            <span className="block text-[10px] text-warm-gray">{member.membership_id} · {member.class_name || 'Class not set'} · {member.department}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -666,6 +720,17 @@ export default function RentalManager() {
                     />
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-warm-charcoal">Class <span className="text-warm-danger">*</span></label>
+                    <input required value={borrowerClass} onChange={event => setBorrowerClass(event.target.value)} placeholder="e.g. S6 ECE" className="w-full rounded-xl border border-warm-border bg-warm-surface px-3 py-2.5 text-sm outline-none focus:border-terracotta" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-warm-charcoal">Department <span className="text-warm-danger">*</span></label>
+                    <input required value={borrowerDepartment} onChange={event => setBorrowerDepartment(event.target.value)} placeholder="e.g. ECE" className="w-full rounded-xl border border-warm-border bg-warm-surface px-3 py-2.5 text-sm outline-none focus:border-terracotta" />
+                  </div>
+                </div>
               </div>
 
               {/* ── Section: IEEE Membership ID ── */}
@@ -686,7 +751,9 @@ export default function RentalManager() {
                       className="w-full bg-warm-surface border border-warm-border rounded-xl py-2.5 px-3 text-sm text-warm-charcoal font-mono focus:outline-none focus:border-terracotta transition-colors"
                     />
                   </div>
-                  <p className="text-[10px] text-warm-gray mt-1">Entered as-is — no verification required.</p>
+                  <a href="https://services24.ieee.org/membership-validator.html" target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-terracotta hover:underline">
+                    Verify with the official IEEE Membership Validator <ExternalLink className="h-3 w-3" />
+                  </a>
                 </div>
               </div>
 
@@ -835,6 +902,7 @@ export default function RentalManager() {
                 <p className="text-warm-gray font-semibold">Registered Contact Info:</p>
                 <p className="text-warm-charcoal"><strong>Email:</strong> {viewingBorrower.member_email}</p>
                 <p className="text-warm-charcoal"><strong>Phone:</strong> {viewingBorrower.member_phone || 'Not provided'}</p>
+                <p className="text-warm-charcoal"><strong>Class:</strong> {viewingBorrower.member_class || 'Not provided'}</p>
                 <p className="text-warm-charcoal"><strong>Department:</strong> {viewingBorrower.member_department}</p>
               </div>
 

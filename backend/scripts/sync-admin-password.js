@@ -8,10 +8,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const username = process.env.ADMIN_USERNAME || 'admin';
-const password = process.env.ADMIN_PASSWORD || 'inventory46@64';
+const password = process.env.ADMIN_PASSWORD;
+if (!password) throw new Error('ADMIN_PASSWORD is required.');
 
 async function syncPassword() {
-  console.log(`Setting password for admin user "${username}" to: "${password}"...`);
+  console.log(`Setting password for admin user "${username}"...`);
   const db = getDbClient();
   const salt = await bcrypt.genSalt(10);
   const hash = await bcrypt.hash(password, salt);

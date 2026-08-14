@@ -1,5 +1,5 @@
-# The entire backend/src is not needed by Vercel - api/index.js is fully self-contained
-backend/src/
+# Runtime source is imported by api/index.js and must be packaged with the
+# serverless function.
 backend/api/
 backend/scripts/
 backend/data/
