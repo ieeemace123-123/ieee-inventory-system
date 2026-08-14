@@ -28,7 +28,10 @@ function getTransporter() {
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
-      }
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000
     });
   }
   return _transporter;
@@ -112,8 +115,15 @@ export async function sendMail({ to, subject, text, html }) {
 
   try {
     const info = await getTransporter().sendMail(mailOptions);
-    console.log(`[Mailer] ✅ Email delivered to ${to} | Message-ID: ${info.messageId}`);
-    return { success: true, messageId: info.messageId };
+    const accepted = Array.isArray(info.accepted) ? info.accepted.map(address => String(address).toLowerCase()) : [];
+    const recipientAccepted = accepted.length === 0 || accepted.includes(to.toLowerCase());
+    if (!recipientAccepted || (Array.isArray(info.rejected) && info.rejected.length > 0)) {
+      const recipientError = `SMTP server did not accept the recipient address "${to}".`;
+      console.error(`[Mailer] ${recipientError}`);
+      return { success: false, error: recipientError, code: 'ERECIPIENT' };
+    }
+    console.log(`[Mailer] Email accepted by SMTP for ${to} | Message-ID: ${info.messageId}`);
+    return { success: true, messageId: info.messageId, accepted: true };
   } catch (error) {
     // Log the full error object — not just error.message — so auth codes are visible
     console.error(`[Mailer] ❌ Failed to send email to "${to}"`);

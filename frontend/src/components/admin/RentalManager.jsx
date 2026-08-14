@@ -313,15 +313,10 @@ export default function RentalManager() {
     setRenewalLoading(true);
     setRenewalError('');
     try {
-      const { data } = await api.patch(`/rentals/${renewingRental.id}/renew`, {
+      await api.patch(`/rentals/${renewingRental.id}/renew`, {
         return_due_date: renewalDueDate
       });
-      const emailNote = data.email_status?.sent
-        ? ' Confirmation email sent.'
-        : data.email_status?.queued
-          ? ' Confirmation email is being delivered.'
-          : '';
-      toast.success(`Rental renewed through ${renewalDueDate}.${emailNote}`);
+      toast.success(`Email sent and rental renewed through ${renewalDueDate}.`);
       setRenewingRental(null);
       await fetchRentals();
     } catch (error) {
@@ -974,7 +969,7 @@ export default function RentalManager() {
                 />
               </label>
               {renewalError && <p className="flex items-start gap-2 rounded-lg bg-warm-danger-bg p-3 text-xs text-warm-danger"><AlertCircle className="h-4 w-4 shrink-0" /> {renewalError}</p>}
-              <p className="text-xs leading-5 text-warm-gray">Renewing keeps the item issued, resets an overdue rental to Active, records the previous deadline, and starts a fresh reminder cycle.</p>
+              <p className="text-xs leading-5 text-warm-gray">The confirmation email must be accepted before the due date changes. Renewal also resets an overdue rental to Active, records the previous deadline, and starts a fresh reminder cycle.</p>
               <div className="flex justify-end gap-2">
                 <button type="button" disabled={renewalLoading} onClick={() => setRenewingRental(null)} className="rounded-xl border border-warm-border px-4 py-2.5 text-xs font-semibold text-warm-charcoal hover:bg-warm-muted">Cancel</button>
                 <button type="submit" disabled={renewalLoading} className="inline-flex items-center gap-2 rounded-xl bg-terracotta px-4 py-2.5 text-xs font-semibold text-white hover:bg-terracotta-hover disabled:opacity-50">

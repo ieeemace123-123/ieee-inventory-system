@@ -273,9 +273,13 @@ export async function initDb() {
       new_due_date DATE NOT NULL,
       renewed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
       renewed_by TEXT NOT NULL DEFAULT 'admin',
+      email_message_id TEXT,
+      email_sent_at TIMESTAMPTZ,
       FOREIGN KEY (rental_id) REFERENCES rentals(id) ON DELETE CASCADE
     );
   `);
+  await db.query(`ALTER TABLE rental_renewals ADD COLUMN IF NOT EXISTS email_message_id TEXT;`);
+  await db.query(`ALTER TABLE rental_renewals ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMPTZ;`);
 
   // 5. Email Notifications Tracking Table
   await db.query(`
