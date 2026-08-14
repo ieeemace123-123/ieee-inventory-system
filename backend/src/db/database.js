@@ -1,5 +1,6 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
+import bcrypt from 'bcryptjs';
 dotenv.config();
 
 const { Pool } = pg;
@@ -114,6 +115,30 @@ export async function initDb() {
       created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Bootstrap the first administrator for a fresh deployment. Existing
+  // credentials are never overwritten during normal application startup.
+  const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (adminPassword) {
+    const existingAdmin = await db.get(
+      'SELECT id FROM admins WHERE username = $1',
+      [adminUsername]
+    );
+    if (!existingAdmin) {
+      const passwordHash = await bcrypt.hash(adminPassword, 12);
+      await db.run(
+        'INSERT INTO admins (username, password_hash) VALUES ($1, $2)',
+        [adminUsername, passwordHash]
+      );
+      console.log(`[Database] Initial administrator created: ${adminUsername}`);
+    }
+  } else {
+    const adminCount = await db.get('SELECT COUNT(*)::int AS count FROM admins');
+    if (adminCount.count === 0) {
+      console.warn('[Database] ADMIN_PASSWORD is not configured; no administrator account was created.');
+    }
+  }
 
   // 2. Members Table
   await db.query(`
