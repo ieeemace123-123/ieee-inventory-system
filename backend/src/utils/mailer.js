@@ -116,7 +116,7 @@ export async function sendMail({ to, subject, text, html }) {
   try {
     const info = await getTransporter().sendMail(mailOptions);
     const accepted = Array.isArray(info.accepted) ? info.accepted.map(address => String(address).toLowerCase()) : [];
-    const recipientAccepted = accepted.length === 0 || accepted.includes(to.toLowerCase());
+    const recipientAccepted = accepted.includes(to.toLowerCase());
     if (!recipientAccepted || (Array.isArray(info.rejected) && info.rejected.length > 0)) {
       const recipientError = `SMTP server did not accept the recipient address "${to}".`;
       console.error(`[Mailer] ${recipientError}`);
